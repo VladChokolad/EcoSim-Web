@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoSim Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f0f0f0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 1rem 2rem;
+            background: rgba(0, 0, 0, 0.7);
+            border-bottom: 2px solid #00b894;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 5rem);
+            background: linear-gradient(90deg, #00b894, #00cec9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: clamp(1rem, 2vw, 2rem);
+            color: #aaa;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
+
+        #ui-panel {
+            width: 30%;
+            min-width: 280px;
+            max-width: 640px;
+            background: rgba(30, 30, 46, 0.9);
+            border-left: 2px solid #00b894;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            z-index: 10;
+            position: relative;
+            backdrop-filter: blur(4px);
+        }
+
+        .section {
+            background: rgba(40, 40, 60, 0.7);
+            border-radius: 10px;
+            padding: 1.2rem;
+            border-left: 4px solid #00b894;
+        }
+
+        .section h2 {
+            font-size: clamp(1.2rem, 3vw, 2rem);
+            margin-bottom: 0.8rem;
+            color: #00cec9;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            background: rgba(50, 50, 70, 0.8);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-3px);
+            background: rgba(60, 60, 80, 0.9);
+        }
+
+        .stat-label {
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            color: #aaa;
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-value {
+            font-size: clamp(1.2rem, 4vw, 2.5rem);
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            flex: 1 1 auto;
+            min-width: 140px;
+            padding: 0.8rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(90deg, #00b894, #00cec9);
+            color: white;
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 184, 148, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.secondary {
+            background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+        }
+
+        button.danger {
+            background: linear-gradient(90deg, #e17055, #fab1a0);
+        }
+
+        button.active-placement {
+            background: linear-gradient(90deg, #fdcb6e, #ffeaa7);
+            box-shadow: 0 0 20px rgba(253, 203, 110, 0.7);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 20px rgba(253, 203, 110, 0.7); }
+            50% { box-shadow: 0 0 30px rgba(253, 203, 110, 0.9); }
+            100% { box-shadow: 0 0 20px rgba(253, 203, 110, 0.7); }
+        }
+
+        .slider-container {
+            margin-top: 1rem;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: clamp(0.8rem, 2vw, 1rem);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00b894;
+            cursor: pointer;
+        }
+
+        footer {
+            padding: 0.5rem;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid #333;
+            font-size: 0.8rem;
+            color: #777;
+            flex-shrink: 0;
+        }
+
+        /* Модальное окно */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: rgba(30, 30, 46, 0.95);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 1000px;
+            padding: 20px;
+            border: 2px solid #00b894;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+            padding: 0 10px;
+        }
+
+        .close-btn:hover {
+            color: #ff6666;
+        }
+
+        .modal-body {
+            text-align: center;
+        }
+
+        #fullsize-chart {
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+            border-radius: 10px;
+            background: rgba(20, 20, 30, 0.9);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            #ui-panel {
+                width: 100%;
+                max-width: none;
+                border-left: none;
+                border-top: 2px solid #00b894;
+                max-height: 45vh;
+                padding: 1rem;
+            }
+            .controls {
+                gap: 0.5rem;
+            }
+            button {
+                min-width: 100px;
+                padding: 0.6rem 0.8rem;
+            }
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            #creature-info-panel {
+                width: 90%;
+                left: 5%;
+                right: auto;
+                top: 10px;
+                padding: 15px;
+                font-size: 0.95rem;
+            }
+        }
+
+        /* Окно информации о существе */
+        #creature-info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 500px;
+            background: rgba(30, 30, 46, 0.98);
+            border: 3px solid #00b894;
+            border-radius: 12px;
+            padding: 25px;
+            z-index: 1000;
+            color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: none;
+            box-shadow: 0 0 40px rgba(0, 184, 148, 0.8);
+            backdrop-filter: blur(8px);
+            resize: both;
+            overflow: auto;
+            min-width: 400px;
+            min-height: 300px;
+            cursor: move;
+        }
+        #creature-info-panel h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #00cec9;
+            border-bottom: 2px solid #00b894;
+            padding-bottom: 12px;
+            font-size: 1.8rem;
+            user-select: none;
+            cursor: move;
+        }
+        .creature-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+        }
+        .creature-info-label {
+            color: #aaa;
+            flex: 1;
+            font-weight: 500;
+        }
+        .creature-info-value {
+            font-weight: bold;
+            color: #fff;
+            flex: 1;
+            text-align: right;
+            font-weight: 600;
+        }
+        #close-creature-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 2.2rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s;
+            z-index: 1001;
+        }
+        #close-creature-info:hover {
+            color: #ff6666;
+        }
+        /* Улучшенный внешний вид для перетаскивания */
+        #creature-info-panel .drag-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            border-radius: 12px 12px 0 0;
+            background: rgba(0, 184, 148, 0.2);
+            cursor: move;
+            z-index: 1;
+        }
+    </style>
+    <!-- Three.js -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <!-- Stats.js для мониторинга FPS -->
+    <script src="https://unpkg.com/stats.js@r17/build/stats.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>EcoSim Web</h1>
+    </header>
+
+    <div class="container">
+        <div id="canvas-container">
+            <div id="stats-container" style="position: absolute; top: 20px; left: 20px; z-index: 100;"></div>
+        </div>
+
+        <div id="ui-panel">
+            <div class="section">
+                <h2>Статистика популяции</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Олени</div>
+                        <div id="deer-count" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Зайцы</div>
+                        <div id="hare-count" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Волки</div>
+                        <div id="wolf-count" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Медведи</div>
+                        <div id="bear-count" class="stat-value">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Управление симуляцией</h2>
+                <div class="controls">
+                    <button id="pause-btn">Пауза</button>
+                    <button id="reset-btn" class="secondary">Сброс</button>
+                    <button id="add-deer-btn" class="secondary">Добавить оленя</button>
+                    <button id="add-hare-btn" class="secondary">Добавить зайца</button>
+                    <button id="add-wolf-btn" class="danger">Добавить волка</button>
+                    <button id="add-bear-btn" class="danger">Добавить медведя</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Настройки</h2>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Скорость симуляции</span>
+                        <span id="speed-value">1.0x</span>
+                    </div>
+                    <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>График популяции</h2>
+                <button id="open-chart-btn" class="secondary" style="width: 100%;">
+                    Открыть график в полном размере
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Симуляция разработана с использованием Three.js | Реализует замкнутую экосистему с механиками движения, питания, размножения и регенерации.</p>
+        <p>FPS: <span id="fps-counter">60</span> | Объектов: <span id="object-count">26</span> | Время: <span id="time-counter">0</span> сек</p>
+    </footer>
+
+    <!-- Модальное окно для графика популяции -->
+    <div id="chart-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>График популяции (полный размер)</h2>
+                <button id="close-chart-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <canvas id="fullsize-chart" width="900" height="500"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Окно информации о существе -->
+    <div id="creature-info-panel">
+        <div class="drag-handle"></div>
+        <button id="close-creature-info" class="close-btn">&times;</button>
+        <h3>Информация о существе</h3>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Тип:</span>
+            <span id="creature-type" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Подтип:</span>
+            <span id="creature-subtype" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Энергия:</span>
+            <span id="creature-energy" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Скорость:</span>
+            <span id="creature-speed" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Состояние:</span>
+            <span id="creature-state" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Позиция:</span>
+            <span id="creature-position" class="creature-info-value">-</span>
+        </div>
+        <div class="creature-info-row">
+            <span class="creature-info-label">Цель:</span>
+            <span id="creature-target" class="creature-info-value">-</span>
+        </div>
+    </div>
+
+    <script src="simulation.js"></script>
+</body>
+</html>
