@@ -1,14 +1,12 @@
 
 
 
-console.log('simulation.js загружен (пещеры с лимитом 3)');
 document.title = 'Симуляция с пещерами (лимит 3)';
 
 if (typeof THREE === 'undefined') {
     alert('Three.js не загружен');
     throw new Error('Three.js не загружен');
 }
-if (typeof Stats === 'undefined') console.warn('Stats.js не загружен');
 
 
 let scene, camera, renderer, controls, stats, ground;
@@ -436,7 +434,7 @@ class Creature {
     findTarget() {}
     eat(target) {}
     reproduce() {
-        const threshold = this.type === 'herbivore' ? 80 : 150;
+        const threshold = this.maxEnergy / 2;
         if (this.energy > threshold) {
             this.energy *= 0.6;
             const offspringEnergy = this.energy * 0.67;
@@ -485,7 +483,6 @@ class Creature {
         }
         this.energy -= 0.3 * deltaTime;
         if (this.energy <= 0) { this.die(); return; }
-        this.updateColor();
         this.move(deltaTime);
         this.findTarget();
         if (this.target && this.position.distanceTo(this.target.position) < 1.2) this.eat(this.target);
@@ -591,7 +588,6 @@ class Herbivore extends Creature {
         if (!this.isAlive) return;
         this.energy -= 0.3 * deltaTime;
         if (this.energy <= 0) { this.die(); return; }
-        this.updateColor();
 
         if (this.isHidden) {
             
@@ -660,7 +656,7 @@ class Herbivore extends Creature {
 
     eat(plant) {
         if (!plant.isAlive) return;
-        this.energy += plant.energy;
+        this.energy = Math.min(this.maxEnergy, this.energy + plant.energy);
         plant.remove();
         const idx = plants.indexOf(plant);
         if (idx > -1) plants.splice(idx, 1);
@@ -686,9 +682,32 @@ class Predator extends Creature {
 
     eat(herbivore) {
         if (!herbivore.isAlive || herbivore.isHidden) return;
-        this.energy += herbivore.energy;
+        this.energy = Math.min(this.maxEnergy, this.energy + herbivore.energy);
         herbivore.die();
         this.target = null;
+    }
+
+    reproduce() {
+        const threshold = this.maxEnergy / 2;
+        if (this.energy > threshold) {
+            this.energy *= 0.6;
+            const offspringEnergy = this.energy * 0.67;
+            let x = this.position.x + (Math.random() - 0.5) * 3;
+            let z = this.position.z + (Math.random() - 0.5) * 3;
+            for (let cave of caves) {
+                if (Math.hypot(x - cave.position.x, z - cave.position.z) < CAVE_RADIUS + 0.6) {
+                    const angle = Math.random() * Math.PI * 2;
+                    x = cave.position.x + Math.cos(angle) * (CAVE_RADIUS + 0.8);
+                    z = cave.position.z + Math.sin(angle) * (CAVE_RADIUS + 0.8);
+                    break;
+                }
+            }
+            const offspring = new Bear(x, z, offspringEnergy);
+            predators.push(offspring);
+            offspring.speed *= 0.85 + Math.random() * 0.3;
+            return offspring;
+        }
+        return null;
     }
 }
 
@@ -764,6 +783,29 @@ class Deer extends Herbivore {
             }
         }
     }
+
+    reproduce() {
+        const threshold = this.maxEnergy / 2;
+        if (this.energy > threshold) {
+            this.energy *= 0.6;
+            const offspringEnergy = this.energy * 0.67;
+            let x = this.position.x + (Math.random() - 0.5) * 3;
+            let z = this.position.z + (Math.random() - 0.5) * 3;
+            for (let cave of caves) {
+                if (Math.hypot(x - cave.position.x, z - cave.position.z) < CAVE_RADIUS + 0.6) {
+                    const angle = Math.random() * Math.PI * 2;
+                    x = cave.position.x + Math.cos(angle) * (CAVE_RADIUS + 0.8);
+                    z = cave.position.z + Math.sin(angle) * (CAVE_RADIUS + 0.8);
+                    break;
+                }
+            }
+            const offspring = new Deer(x, z, offspringEnergy);
+            herbivores.push(offspring);
+            offspring.speed *= 0.85 + Math.random() * 0.3;
+            return offspring;
+        }
+        return null;
+    }
 }
 
 class Hare extends Herbivore {
@@ -804,7 +846,7 @@ class Hare extends Herbivore {
 
     reproduce() {
         
-        const threshold = 30;
+        const threshold = this.maxEnergy / 2;
         if (this.energy > threshold) {
             this.energy *= 0.6;
             const offspringEnergy = this.energy * 0.67;
@@ -1000,13 +1042,13 @@ class Bear extends Predator {
     eat(target) {
         if (!target.isAlive) return;
         if (target instanceof Plant) {
-            this.energy += target.energy;
+            this.energy = Math.min(this.maxEnergy, this.energy + target.energy);
             target.remove();
             const idx = plants.indexOf(target);
             if (idx > -1) plants.splice(idx, 1);
         } else {
             
-            this.energy += target.energy;
+            this.energy = Math.min(this.maxEnergy, this.energy + target.energy);
             target.die();
         }
         this.target = null;
@@ -1073,7 +1115,9 @@ function initUI() {
     timeCounterEl = document.getElementById('time-counter');
     chartModal = document.getElementById('chart-modal');
     const fullsizeCanvas = document.getElementById('fullsize-chart');
-    if (fullsizeCanvas) fullsizeChartCtx = fullsizeCanvas.getContext('2d');
+    if (fullsizeCanvas) {
+        fullsizeChartCtx = fullsizeCanvas.getContext('2d');
+    }
     openChartBtn = document.getElementById('open-chart-btn');
     closeChartBtn = document.getElementById('close-chart-btn');
     if (openChartBtn && closeChartBtn) {
@@ -1189,6 +1233,7 @@ function initUI() {
     
     renderer.domElement.addEventListener('wheel', handleWheel);
     setInterval(updateUI, 100);
+    
 }
 
 function togglePause() {
@@ -1203,7 +1248,15 @@ function resetSimulation() {
     predators.forEach(p => p.die());
     caves.forEach(c => c.remove());
     plants = []; herbivores = []; predators = []; caves = [];
-    populationHistory = { plants: [], herbivores: [], predators: [] };
+    populationHistory = {
+        plants: [],
+        herbivores: [],
+        predators: [],
+        deer: [],
+        hare: [],
+        wolf: [],
+        bear: []
+    };
     simulationTime = 0;
     initSimulation();
     simulationPaused = false;
@@ -1265,11 +1318,9 @@ function handleWheel(event) {
 }
 
 function handleCanvasClick(event) {
-    console.log('Canvas click at', event.clientX, event.clientY);
     const rect = renderer.domElement.getBoundingClientRect();
     const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    console.log('Normalized coords', mouseX, mouseY);
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
     
@@ -1328,9 +1379,7 @@ function handleCanvasClick(event) {
 }
 
 function showCreatureInfo(creature) {
-    console.log('showCreatureInfo вызвана для', creature);
     if (!creatureInfoPanel) {
-        console.warn('creatureInfoPanel не найден');
         return;
     }
     
@@ -1342,10 +1391,8 @@ function showCreatureInfo(creature) {
     creaturePositionEl.textContent = `(${creature.position.x.toFixed(1)}, ${creature.position.y.toFixed(1)}, ${creature.position.z.toFixed(1)})`;
     creatureTargetEl.textContent = creature.target ? 'Есть' : 'Нет';
     
-    
     creatureInfoPanel.style.display = 'block';
     selectedCreature = creature;
-    console.log('Панель должна быть видима');
 }
 
 function updateUI() {
@@ -1373,6 +1420,12 @@ function updateUI() {
 
 
 function updatePopulationHistory() {
+    if (!populationHistory.deer) {
+        populationHistory.deer = [];
+        populationHistory.hare = [];
+        populationHistory.wolf = [];
+        populationHistory.bear = [];
+    }
     populationHistory.plants.push(plants.length);
     populationHistory.herbivores.push(herbivores.length);
     populationHistory.predators.push(predators.length);
@@ -1403,12 +1456,14 @@ function updatePopulationHistory() {
 }
 
 function openChartModal() {
-    if (!chartModal) return;
+    if (!chartModal) {
+        return;
+    }
     chartModal.style.display = 'flex';
     drawFullSizeChart();
     
     if (chartUpdateInterval) clearInterval(chartUpdateInterval);
-    chartUpdateInterval = setInterval(drawFullSizeChart, 500); 
+    chartUpdateInterval = setInterval(drawFullSizeChart, 500);
 }
 
 function closeChartModal() {
@@ -1421,9 +1476,22 @@ function closeChartModal() {
 }
 
 function drawFullSizeChart() {
-    if (!fullsizeChartCtx) return;
+    if (!fullsizeChartCtx) {
+        console.warn('fullsizeChartCtx отсутствует');
+        return;
+    }
     const canvas = document.getElementById('fullsize-chart');
-    const width = canvas.clientWidth, height = canvas.clientHeight;
+    if (!canvas) {
+        console.warn('canvas fullsize-chart не найден');
+        return;
+    }
+    // Используем offsetWidth/offsetHeight, которые включают padding и border
+    const width = canvas.offsetWidth || 900;
+    const height = canvas.offsetHeight || 500;
+    if (width <= 0 || height <= 0) {
+        console.warn('canvas имеет нулевые размеры:', width, height);
+        return;
+    }
     canvas.width = width;
     canvas.height = height;
     const ctx = fullsizeChartCtx;
@@ -1436,7 +1504,10 @@ function drawFullSizeChart() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
     }
     const drawLine = (data, color, maxVal) => {
-        if (data.length < 2) return;
+        if (data.length < 2) {
+            console.log('Недостаточно данных для рисования линии:', color, data.length);
+            return;
+        }
         ctx.strokeStyle = color;
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -1455,12 +1526,21 @@ function drawFullSizeChart() {
         ...populationHistory.wolf,
         ...populationHistory.bear
     ];
-    const maxVal = Math.max(...allData, 1);
+    const maxVal = allData.length > 0 ? Math.max(...allData, 1) : 1;
     
-    drawLine(populationHistory.deer, '#8B4513', maxVal); 
-    drawLine(populationHistory.hare, '#808080', maxVal); 
-    drawLine(populationHistory.wolf, '#666666', maxVal); 
-    drawLine(populationHistory.bear, '#654321', maxVal); 
+    console.log('Данные для графика:', {
+        deer: populationHistory.deer.length,
+        hare: populationHistory.hare.length,
+        wolf: populationHistory.wolf.length,
+        bear: populationHistory.bear.length,
+        maxVal,
+        canvasSize: { width, height }
+    });
+    
+    drawLine(populationHistory.deer, '#8B4513', maxVal);
+    drawLine(populationHistory.hare, '#808080', maxVal);
+    drawLine(populationHistory.wolf, '#666666', maxVal);
+    drawLine(populationHistory.bear, '#654321', maxVal);
     
     ctx.font = '14px Arial';
     ctx.fillStyle = '#8B4513';
@@ -1532,9 +1612,7 @@ function init() {
             }
         }, 1000);
         animate(0);
-        console.log('Симуляция с пещерами (лимит 3) запущена');
     } catch (error) {
-        console.error(error);
         alert('Ошибка: ' + error.message);
     }
 }
